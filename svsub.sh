@@ -9,8 +9,16 @@ function readSvSub4(){
       sudo grep -E '(\[0\]:|wMsgQueueError|wLastSecondeCounter|iMaxDeltaTsNs|wNbLostSvTimeout|wNbTsOver1ms|wNbSeconde|wRequest|wAccepcted|wRejected|wSvUnavailable)' "${dir}"/output.txt >> "${reportFileName}"
 
       ied_name=$(basename "${dir}")
-      svsub_output=$(sudo grep '\[0\]:' "${dir}/output.txt" | sed -n 's/.*\[0\]:\s*\(.*\)/\1/p' | xargs)
-      svsub_outputs+=("${ied_name} ${svsub_output}")
+      # Extraction des lignes [0] et [1] (il peut y avoir 1 ou 2 lignes)
+      svsub_line0=$(sudo grep '\[0\]:' "${dir}/output.txt" | sed -n 's/.*\[0\]:\s*\(.*\)/\1/p' | xargs)
+      svsub_line1=$(sudo grep '\[1\]:' "${dir}/output.txt" | sed -n 's/.*\[1\]:\s*\(.*\)/\1/p' | xargs)
+
+      # On stocke toujours la ligne [0], et on ajoute [1] uniquement si elle existe
+      if [ -n "${svsub_line1}" ]; then
+        svsub_outputs+=("${ied_name} ${svsub_line0} ${svsub_line1}")
+      else
+        svsub_outputs+=("${ied_name} ${svsub_line0}")
+      fi
       maxdelta_output=$(sudo grep 'iMaxDeltaTsNs' "${dir}/output.txt" | awk -F':' '{print $6}')
       if [ -z "$maxdelta_output" ]; then
         maxdelta_outputs+=("${ied_name} 0")
@@ -47,7 +55,16 @@ function readSvSub4(){
   done
 
   jq -n \
-  --argjson svsub "$(printf '%s\n' "${svsub_outputs[@]}" | awk '{print "{\"ied\":\""$1"\",\"receivedpersec\":\""$2"\",\"received\":\""$3"\",\"sup1ms\":\""$4"\",\"sup3ms\":\""$5"\",\"sup5ms\":\""$6"\",\"sup10ms\":\""$7"\",\"sup15ms\":\""$8"\"}"}' | jq -s '.')" \
+  --argjson svsub "$(printf '%s\n' "${svsub_outputs[@]}" | awk '{
+    # 1 champ pour ied + 7 par ligne de données
+    if (NF >= 15) {
+      # Deux lignes de données : index 0 et 1
+      printf("{\"ied\":\"%s\",\"receivedpersec_0\":\"%s\",\"received_0\":\"%s\",\"sup1ms_0\":\"%s\",\"sup3ms_0\":\"%s\",\"sup5ms_0\":\"%s\",\"sup10ms_0\":\"%s\",\"sup15ms_0\":\"%s\",\"receivedpersec_1\":\"%s\",\"received_1\":\"%s\",\"sup1ms_1\":\"%s\",\"sup3ms_1\":\"%s\",\"sup5ms_1\":\"%s\",\"sup10ms_1\":\"%s\",\"sup15ms_1\":\"%s\"}\n",$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15);
+    } else {
+      # Une seule ligne de données : uniquement index 0
+      printf("{\"ied\":\"%s\",\"receivedpersec_0\":\"%s\",\"received_0\":\"%s\",\"sup1ms_0\":\"%s\",\"sup3ms_0\":\"%s\",\"sup5ms_0\":\"%s\",\"sup10ms_0\":\"%s\",\"sup15ms_0\":\"%s\"}\n",$1,$2,$3,$4,$5,$6,$7,$8);
+    }
+  }' | jq -s '.')" \
   --argjson maxdelta "$(printf '%s\n' "${maxdelta_outputs[@]}" | awk '{print "{\"ied\":\""$1"\",\"maxsvdelta\":\""($2?$2:"")"\"}"}' | jq -s '.')" \
   --argjson nblost "$(printf '%s\n' "${nblost_outputs[@]}" | awk '{print "{\"ied\":\""$1"\",\"nbsvlost\":\""($2?$2:"")"\"}"}' | jq -s '.')" \
   --argjson msgqueueerr "$(printf '%s\n' "${msgqueueerr_outputs[@]}" | awk '{print "{\"ied\":\""$1"\",\"msgqueueerr\":\""($2?$2:"0")"\"}"}' | jq -s '.')" \

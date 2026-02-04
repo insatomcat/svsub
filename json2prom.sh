@@ -4,13 +4,25 @@ prom_file="/var/lib/node_exporter/textfile_collector/rt_report.prom"
 
 jq -r '
   .delayed_sv_summary[] |
-  "sv_received_per_sec{ied=\"" + .ied + "\"} " + .receivedpersec,
-  "sv_received_total{ied=\"" + .ied + "\"} " + .received,
-  "sv_sup1ms{ied=\"" + .ied + "\"} " + .sup1ms,
-  "sv_sup3ms{ied=\"" + .ied + "\"} " + .sup3ms,
-  "sv_sup5ms{ied=\"" + .ied + "\"} " + .sup5ms,
-  "sv_sup10ms{ied=\"" + .ied + "\"} " + .sup10ms,
-  "sv_sup15ms{ied=\"" + .ied + "\"} " + .sup15ms
+  # Toujours index 0
+  "sv_received_per_sec{ied=\"" + .ied + "\",index=\"0\"} " + .receivedpersec_0,
+  "sv_received_total{ied=\"" + .ied + "\",index=\"0\"} " + .received_0,
+  "sv_sup1ms{ied=\"" + .ied + "\",index=\"0\"} " + .sup1ms_0,
+  "sv_sup3ms{ied=\"" + .ied + "\",index=\"0\"} " + .sup3ms_0,
+  "sv_sup5ms{ied=\"" + .ied + "\",index=\"0\"} " + .sup5ms_0,
+  "sv_sup10ms{ied=\"" + .ied + "\",index=\"0\"} " + .sup10ms_0,
+  "sv_sup15ms{ied=\"" + .ied + "\",index=\"0\"} " + .sup15ms_0,
+
+  # Index 1 uniquement si présent dans le JSON
+  (if .receivedpersec_1 != null then
+    "sv_received_per_sec{ied=\"" + .ied + "\",index=\"1\"} " + .receivedpersec_1,
+    "sv_received_total{ied=\"" + .ied + "\",index=\"1\"} " + .received_1,
+    "sv_sup1ms{ied=\"" + .ied + "\",index=\"1\"} " + .sup1ms_1,
+    "sv_sup3ms{ied=\"" + .ied + "\",index=\"1\"} " + .sup3ms_1,
+    "sv_sup5ms{ied=\"" + .ied + "\",index=\"1\"} " + .sup5ms_1,
+    "sv_sup10ms{ied=\"" + .ied + "\",index=\"1\"} " + .sup10ms_1,
+    "sv_sup15ms{ied=\"" + .ied + "\",index=\"1\"} " + .sup15ms_1
+   else empty end)
 ' "$json_file" > "$prom_file"
 
 jq -r '
