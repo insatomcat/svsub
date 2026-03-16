@@ -55,6 +55,9 @@ function readSvSub4(){
 
   sudo mkdir -p /var/cap/telegraf/input_files
   sudo cp /tmp/rt-report-svsub.json /var/cap/telegraf/input_files/rt-report-svsub.json
+  #AJOUT RTE
+  sudo /usr/local/bin/json2prom.sh
+  #FIN AJOUT RTE
   sudo chmod 644 /tmp/rt-report-svsub.json
   sudo chmod 644 /var/cap/telegraf/input_files/rt-report-svsub.json
 
