@@ -1,0 +1,39 @@
+svSub 4
+2026-02-04 08:30:39.097:  ----    Counter with smSimu :
+2026-02-04 08:30:39.097:  wNbPort             : 2
+2026-02-04 08:30:39.097:  wNbSeconde          : 2657
+2026-02-04 08:30:39.097:  wTimeout            : 0
+2026-02-04 08:30:39.097:  wRequestAborted     : 0
+2026-02-04 08:30:39.097:  wSvUnavailable      : 5284
+2026-02-04 08:30:39.097:  Port Index[0000]
+2026-02-04 08:30:39.097:  	wRequest                : 6377792
+2026-02-04 08:30:39.097:  	wAccepctedByFilter      : 6376119
+2026-02-04 08:30:39.097:  	wRejectedWrongEtherType : 0
+2026-02-04 08:30:39.097:  	wRejectedByFilter       : 257
+2026-02-04 08:30:39.097:  	wRejectedWrongSimu      : 0
+2026-02-04 08:30:39.097:  	wMsgQueueError      	: 0
+2026-02-04 08:30:39.097:  Port Index[0001]
+2026-02-04 08:30:39.097:  	wRequest                : 0
+2026-02-04 08:30:39.097:  	wAccepctedByFilter      : 0
+2026-02-04 08:30:39.097:  	wRejectedWrongEtherType : 0
+2026-02-04 08:30:39.097:  	wRejectedByFilter       : 0
+2026-02-04 08:30:39.097:  	wRejectedWrongSimu      : 0
+2026-02-04 08:30:39.097:  	wMsgQueueError      	: 0
+2026-02-04 08:30:39.097:  ----    Sv subscriber status :
+2026-02-04 08:30:39.097:  onlineFlag  : 1
+2026-02-04 08:30:39.097:  flagUpdate  : 0
+2026-02-04 08:30:39.097:  	wNbSeconde:2657
+2026-02-04 08:30:39.097:        wLastSecondeCounter      wNbSvFrameReceived   wThreshold: 1ms        3ms        5ms        10ms       15ms
+2026-02-04 08:30:39.097:   [0]:    0                        0                               0          0          0          0          0
+2026-02-04 08:30:39.097:   [1]:    4796                     12747430                        0          0          0          0          0
+2026-02-04 08:30:39.097:  Delta Time:	iMaxDeltaTsNs:900439
+2026-02-04 08:30:39.097:  ----    SvRef information :
+2026-02-04 08:30:39.097:  Synched Subscriber used as Reference          : 1
+2026-02-04 08:30:39.097:  Slot Index used as Reference                  : 13
+2026-02-04 08:30:39.097:  iLastSyncSvReceived                           : 1
+2026-02-04 08:30:39.097:  iSvRefForUnreceived                           : 1
+2026-02-04 08:30:39.097:  wNbSecForRefSv                                : 0
+2026-02-04 08:30:39.097:  iUnsynchedRefSv                               : -1
+2026-02-04 08:30:39.097:  wNbLostSvTimeout                              : 2
+2026-02-04 08:30:39.097:  wSampleRate                                   : 4800
+2026-02-04 08:30:39.098:  bIsSimulationMode                             : 0
