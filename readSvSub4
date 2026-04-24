@@ -6,10 +6,11 @@ function readSvSub4(){
       echo "" >> "${reportFileName}"
       echo "Reading svsub4 for directory: ${dir}" >> "${reportFileName}"
       sudo ./p7c_readsvsub.py "${dir}"
-      sudo grep -E '(\[0\]:|wMsgQueueError|wLastSecondeCounter|iMaxDeltaTsNs|wNbLostSvTimeout|wNbTsOver1ms|wNbSeconde|wRequest|wAccepcted|wRejected|wSvUnavailable)' "${dir}"/output.txt >> "${reportFileName}"
+      sudo grep -E '(\[0\]:|\ \[1\]:|wMsgQueueError|wLastSecondeCounter|iMaxDeltaTsNs|wNbLostSvTimeout|wNbTsOver1ms|wNbSeconde|wRequest|wAccepcted|wRejected|wSvUnavailable)' "${dir}"/output.txt >> "${reportFileName}"
 
       ied_name=$(basename "${dir}")
-      # Extraction des lignes [0] et [1] (il peut y avoir 1 ou 2 lignes)
+
+      # Extraction des lignes [0] et [1] (il peut y avoir 1 ou 2 flux SV)
       svsub_line0=$(sudo grep '\[0\]:' "${dir}/output.txt" | sed -n 's/.*\[0\]:\s*\(.*\)/\1/p' | xargs)
       svsub_line1=$(sudo grep '\[1\]:' "${dir}/output.txt" | sed -n 's/.*\[1\]:\s*\(.*\)/\1/p' | xargs)
 
@@ -19,6 +20,7 @@ function readSvSub4(){
       else
         svsub_outputs+=("${ied_name} ${svsub_line0}")
       fi
+
       maxdelta_output=$(sudo grep 'iMaxDeltaTsNs' "${dir}/output.txt" | awk -F':' '{print $6}')
       if [ -z "$maxdelta_output" ]; then
         maxdelta_outputs+=("${ied_name} 0")
@@ -38,43 +40,136 @@ function readSvSub4(){
 
   echo "" >> "${reportFileName}"
   echo "svSub 4 -- delayed sv summary" >> "${reportFileName}"
+  echo "=============================================================================" >> "${reportFileName}"
+  echo "Format: IED | Flux [0]: SV/s Total >1ms >3ms >5ms >10ms >15ms | Flux [1]: idem" >> "${reportFileName}"
+  echo "-----------------------------------------------------------------------------" >> "${reportFileName}"
+  printf "%-7s | %-6s %-12s %-5s %-5s %-5s %-5s %-5s | %-6s %-12s %-5s %-5s %-5s %-5s %-5s\n" \
+         "IED" "SV/s" "Total" ">1ms" ">3ms" ">5ms" ">10ms" ">15ms" \
+         "SV/s" "Total" ">1ms" ">3ms" ">5ms" ">10ms" ">15ms" >> "${reportFileName}"
+  echo "-----------------------------------------------------------------------------" >> "${reportFileName}"
   for output in "${svsub_outputs[@]}"; do
-    echo -e "$output" >> "${reportFileName}"
+    # Parse les champs
+    read -ra fields <<< "$output"
+    ied="${fields[0]}"
+    if [ ${#fields[@]} -ge 15 ]; then
+      # 2 flux
+      printf "%-7s | %-6s %-12s %-5s %-5s %-5s %-5s %-5s | %-6s %-12s %-5s %-5s %-5s %-5s %-5s\n" \
+             "$ied" "${fields[1]}" "${fields[2]}" "${fields[3]}" "${fields[4]}" "${fields[5]}" "${fields[6]}" "${fields[7]}" \
+             "${fields[8]}" "${fields[9]}" "${fields[10]}" "${fields[11]}" "${fields[12]}" "${fields[13]}" "${fields[14]}" >> "${reportFileName}"
+    else
+      # 1 seul flux
+      printf "%-7s | %-6s %-12s %-5s %-5s %-5s %-5s %-5s | %-6s %-12s %-5s %-5s %-5s %-5s %-5s\n" \
+             "$ied" "${fields[1]:-0}" "${fields[2]:-0}" "${fields[3]:-0}" "${fields[4]:-0}" "${fields[5]:-0}" "${fields[6]:-0}" "${fields[7]:-0}" \
+             "-" "-" "-" "-" "-" "-" "-" >> "${reportFileName}"
+    fi
   done
-  echo "svSub 4 -- iMaxDeltaTsNs summary" >> "${reportFileName}"
+  echo "=============================================================================" >> "${reportFileName}"
+  echo "" >> "${reportFileName}"
+  echo "svSub 4 -- iMaxDeltaTsNs summary (écart max entre timestamps SV en ns)" >> "${reportFileName}"
+  echo "-----------------------------------------------------------------------" >> "${reportFileName}"
+  printf "%-10s | %s\n" "IED" "MaxDelta (ns)" >> "${reportFileName}"
+  echo "-----------------------------------------------------------------------" >> "${reportFileName}"
   for output in "${maxdelta_outputs[@]}"; do
-    echo -e "$output" >> "${reportFileName}"
+    read -ra fields <<< "$output"
+    printf "%-10s | %s\n" "${fields[0]}" "${fields[1]:-0}" >> "${reportFileName}"
   done
-  echo "svSub 4 -- wNbLostSvTimeout summary" >> "${reportFileName}"
+  echo "" >> "${reportFileName}"
+  echo "svSub 4 -- wNbLostSvTimeout summary (SV perdus par timeout)" >> "${reportFileName}"
+  echo "-----------------------------------------------------------------------" >> "${reportFileName}"
+  printf "%-10s | %s\n" "IED" "NbLost" >> "${reportFileName}"
+  echo "-----------------------------------------------------------------------" >> "${reportFileName}"
   for output in "${nblost_outputs[@]}"; do
-    echo -e "$output" >> "${reportFileName}"
+    read -ra fields <<< "$output"
+    printf "%-10s | %s\n" "${fields[0]}" "${fields[1]:-0}" >> "${reportFileName}"
   done
-  echo "svSub 4 -- wMsgQueueError summary" >> "${reportFileName}"
+  echo "" >> "${reportFileName}"
+  echo "svSub 4 -- wMsgQueueError summary (erreurs file messages)" >> "${reportFileName}"
+  echo "-----------------------------------------------------------------------" >> "${reportFileName}"
+  printf "%-10s | %s\n" "IED" "MsgQueueErr" >> "${reportFileName}"
+  echo "-----------------------------------------------------------------------" >> "${reportFileName}"
   for output in "${msgqueueerr_outputs[@]}"; do
-    echo -e "$output" >> "${reportFileName}"
+    read -ra fields <<< "$output"
+    printf "%-10s | %s\n" "${fields[0]}" "${fields[1]:-0}" >> "${reportFileName}"
   done
+  echo "" >> "${reportFileName}"
+
+  # --- Memory stats (global host) ---
+  read mem_used_kb mem_available_kb < <(
+    free | awk '/^Mem:/ {print $3, $7}'
+  )
+
+# Conversion en GB (2 décimales)
+  mem_used_gb=$(awk "BEGIN { printf \"%.2f\", $mem_used_kb / 1024 / 1024 }")
+  mem_available_gb=$(awk "BEGIN { printf \"%.2f\", $mem_available_kb / 1024 / 1024 }")
+
+
+  # --- Container runtime stats ---
+  container_stats=()
+
+  while read -r name cpu mem; do
+    cname="${name#*}"
+    status=$(sudo docker inspect -f '{{.State.Status}}' "$cname" 2>/dev/null)
+
+    cpu_val="${cpu%\%}"
+    mem_val="${mem%\%}"
+
+    ied=$(echo "$cname" | sed -E 's/(ied-[0-9]+).*/\1/')
+
+    # ---- uptime réel ----
+    started_at=$(sudo docker inspect -f '{{.State.StartedAt}}' "$cname" 2>/dev/null)
+    if [ -n "$started_at" ]; then
+      start_ts=$(date -d "$started_at" +%s)
+      now_ts=$(date +%s)
+      uptime_sec=$((now_ts - start_ts))
+      uptime_days=$(awk "BEGIN { printf \"%.2f\", $uptime_sec / 86400 }")
+    else
+      uptime_days="0.00"
+    fi
+
+
+    # ---- CPU index depuis docker-compose ----
+    best_effort_cpu=$(sudo docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$cname" \
+      | grep '^BEST_EFFORT_CPU_INDEX=' | cut -d= -f2)
+
+    real_time_cpu=$(sudo docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$cname" \
+      | grep '^REAL_TIME_CPU_INDEX=' | cut -d= -f2)
+
+    trace_level=$(sudo docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$cname" \
+      | grep '^TRACE_PRINT_LEVEL=' | cut -d= -f2)
+
+    best_effort_cpu=${best_effort_cpu:-"-1"}
+    real_time_cpu=${real_time_cpu:-"-1"}
+    trace_level=${trace_level:-"-1"}
+
+    container_stats+=("{\"ied\":\"$ied\",\"container\":\"$cname\",\"status\":\"$status\",\"cpu_pct\":$cpu_val,\"mem_pct\":$mem_val,\"uptime_days\":$uptime_days,\"best_effort_cpu\":$best_effort_cpu,\"real_time_cpu\":$real_time_cpu,\"trace_level\":$trace_level}")
+
+  done < <(sudo docker stats --no-stream --format '{{.Name}} {{.CPUPerc}} {{.MemPerc}}')
+
 
   jq -n \
   --argjson svsub "$(printf '%s\n' "${svsub_outputs[@]}" | awk '{
-    # 1 champ pour ied + 7 par ligne de données
+    # 1 champ pour ied + 7 par flux
+    # Flux 0 est toujours présent
+    printf("{\"ied\":\"%s\",\"flux\":\"0\",\"receivedpersec\":\"%s\",\"received\":\"%s\",\"sup1ms\":\"%s\",\"sup3ms\":\"%s\",\"sup5ms\":\"%s\",\"sup10ms\":\"%s\",\"sup15ms\":\"%s\"}\n",$1,$2,$3,$4,$5,$6,$7,$8);
     if (NF >= 15) {
-      # Deux lignes de données : index 0 et 1
-      printf("{\"ied\":\"%s\",\"receivedpersec_0\":\"%s\",\"received_0\":\"%s\",\"sup1ms_0\":\"%s\",\"sup3ms_0\":\"%s\",\"sup5ms_0\":\"%s\",\"sup10ms_0\":\"%s\",\"sup15ms_0\":\"%s\",\"receivedpersec_1\":\"%s\",\"received_1\":\"%s\",\"sup1ms_1\":\"%s\",\"sup3ms_1\":\"%s\",\"sup5ms_1\":\"%s\",\"sup10ms_1\":\"%s\",\"sup15ms_1\":\"%s\"}\n",$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15);
-    } else {
-      # Une seule ligne de données : uniquement index 0
-      printf("{\"ied\":\"%s\",\"receivedpersec_0\":\"%s\",\"received_0\":\"%s\",\"sup1ms_0\":\"%s\",\"sup3ms_0\":\"%s\",\"sup5ms_0\":\"%s\",\"sup10ms_0\":\"%s\",\"sup15ms_0\":\"%s\"}\n",$1,$2,$3,$4,$5,$6,$7,$8);
+      # Flux 1 existe aussi
+      printf("{\"ied\":\"%s\",\"flux\":\"1\",\"receivedpersec\":\"%s\",\"received\":\"%s\",\"sup1ms\":\"%s\",\"sup3ms\":\"%s\",\"sup5ms\":\"%s\",\"sup10ms\":\"%s\",\"sup15ms\":\"%s\"}\n",$1,$9,$10,$11,$12,$13,$14,$15);
     }
   }' | jq -s '.')" \
-  --argjson maxdelta "$(printf '%s\n' "${maxdelta_outputs[@]}" | awk '{print "{\"ied\":\""$1"\",\"maxsvdelta\":\""($2?$2:"")"\"}"}' | jq -s '.')" \
-  --argjson nblost "$(printf '%s\n' "${nblost_outputs[@]}" | awk '{print "{\"ied\":\""$1"\",\"nbsvlost\":\""($2?$2:"")"\"}"}' | jq -s '.')" \
+  --argjson maxdelta "$(printf '%s\n' "${maxdelta_outputs[@]}" | awk '{print "{\"ied\":\""$1"\",\"maxsvdelta\":\""($2?$2:"0")"\"}"}' | jq -s '.')" \
+  --argjson nblost "$(printf '%s\n' "${nblost_outputs[@]}" | awk '{print "{\"ied\":\""$1"\",\"nbsvlost\":\""($2?$2:"0")"\"}"}' | jq -s '.')" \
   --argjson msgqueueerr "$(printf '%s\n' "${msgqueueerr_outputs[@]}" | awk '{print "{\"ied\":\""$1"\",\"msgqueueerr\":\""($2?$2:"0")"\"}"}' | jq -s '.')" \
-  '{delayed_sv_summary: $svsub, maxdelta_summary: $maxdelta, lostsv_summary: $nblost, msgqueueerr_summary: $msgqueueerr}' | sudo sponge /tmp/rt-report-svsub.json
+  --argjson container_stats "$(printf '%s\n' "${container_stats[@]}" | jq -s '.')" \
+  --argjson memory "{\"used_gb\": $mem_used_gb, \"available_gb\": $mem_available_gb}" \
+  '{delayed_sv_summary: $svsub, maxdelta_summary: $maxdelta, lostsv_summary: $nblost, msgqueueerr_summary: $msgqueueerr, container_stats: $container_stats, memory: $memory}' | sudo sponge /tmp/rt-report-svsub.json
 
   sudo mkdir -p /var/cap/telegraf/input_files
   sudo cp /tmp/rt-report-svsub.json /var/cap/telegraf/input_files/rt-report-svsub.json
+
   #AJOUT RTE
   sudo /usr/local/bin/json2prom.sh
   #FIN AJOUT RTE
+
   sudo chmod 644 /tmp/rt-report-svsub.json
   sudo chmod 644 /var/cap/telegraf/input_files/rt-report-svsub.json
 
